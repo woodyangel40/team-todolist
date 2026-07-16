@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Team Todolist - สมัครสมาชิก</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="auth-page">
+  <div class="auth-container">
+    <div class="auth-card">
+      <div class="auth-header">
+        <h1>สมัครสมาชิก</h1>
+        <p>สร้างบัญชีใหม่เพื่อเข้าร่วมทีม</p>
+      </div>
+      <form id="registerForm">
+        <div class="form-group">
+          <label for="displayName">ชื่อที่แสดง</label>
+          <input type="text" id="displayName" placeholder="กรอกชื่อ-นามสกุล" required>
+        </div>
+        <div class="form-group">
+          <label for="username">ชื่อผู้ใช้</label>
+          <input type="text" id="username" placeholder="กรอกชื่อผู้ใช้" required>
+        </div>
+        <div class="form-group">
+          <label for="password">รหัสผ่าน</label>
+          <input type="password" id="password" placeholder="กรอกรหัสผ่าน" required>
+        </div>
+        <div id="errorMsg" class="error-msg"></div>
+        <button type="submit" class="btn btn-primary btn-full">สมัครสมาชิก</button>
+      </form>
+      <div class="auth-footer">
+        <p>มีบัญชีอยู่แล้ว? <a href="/">เข้าสู่ระบบ</a></p>
+      </div>
+    </div>
+  </div>
+  <script src="/js/auth.js"></script>
+</body>
+</html>

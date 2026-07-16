@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Team Todolist - Dashboard</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-brand">Team Todolist</div>
+    <div class="nav-user">
+      <span id="currentUser"></span>
+      <button id="logoutBtn" class="btn btn-outline btn-sm">ออกจากระบบ</button>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <h2>งานของทีม</h2>
+        <span id="taskCount" class="badge">0 งาน</span>
+      </div>
+      <div class="toolbar-right">
+        <input type="text" id="searchInput" placeholder="ค้นหางาน..." class="search-input">
+        <select id="filterStatus" class="filter-select">
+          <option value="all">ทุกสถานะ</option>
+          <option value="todo">รอดำเนินการ</option>
+          <option value="in-progress">กำลังทำ</option>
+          <option value="done">เสร็จแล้ว</option>
+        </select>
+        <select id="filterPriority" class="filter-select">
+          <option value="all">ทุกความสำคัญ</option>
+          <option value="high">สูง</option>
+          <option value="medium">ปานกลาง</option>
+          <option value="low">ต่ำ</option>
+        </select>
+        <button id="addTaskBtn" class="btn btn-primary">+ เพิ่มงานใหม่</button>
+      </div>
+    </div>
+
+    <div class="board">
+      <div class="column" data-status="todo">
+        <div class="column-header">
+          <h3>รอดำเนินการ</h3>
+          <span class="column-count" id="todoCount">0</span>
+        </div>
+        <div class="task-list" id="todoList"></div>
+      </div>
+      <div class="column" data-status="in-progress">
+        <div class="column-header">
+          <h3>กำลังทำ</h3>
+          <span class="column-count" id="inProgressCount">0</span>
+        </div>
+        <div class="task-list" id="inProgressList"></div>
+      </div>
+      <div class="column" data-status="done">
+        <div class="column-header">
+          <h3>เสร็จแล้ว</h3>
+          <span class="column-count" id="doneCount">0</span>
+        </div>
+        <div class="task-list" id="doneList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="taskModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalTitle">เพิ่มงานใหม่</h3>
+        <button class="modal-close" id="closeModal">&times;</button>
+      </div>
+      <form id="taskForm">
+        <input type="hidden" id="taskId">
+        <div class="form-group">
+          <label for="taskTitle">ชื่องาน *</label>
+          <input type="text" id="taskTitle" placeholder="กรอกชื่องาน" required>
+        </div>
+        <div class="form-group">
+          <label for="taskDescription">รายละเอียด</label>
+          <textarea id="taskDescription" placeholder="กรอกรายละเอียดงาน" rows="3"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="taskAssignee">ผู้รับผิดชอบ</label>
+            <select id="taskAssignee">
+              <option value="">-- ไม่ระบุ --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="taskPriority">ความสำคัญ</label>
+            <select id="taskPriority">
+              <option value="low">ต่ำ</option>
+              <option value="medium" selected>ปานกลาง</option>
+              <option value="high">สูง</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="taskStatus">สถานะ</label>
+            <select id="taskStatus">
+              <option value="todo">รอดำเนินการ</option>
+              <option value="in-progress">กำลังทำ</option>
+              <option value="done">เสร็จแล้ว</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="taskDueDate">วันครบกำหนด</label>
+            <input type="date" id="taskDueDate">
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-outline" id="cancelBtn">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary">บันทึก</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="confirmModal" class="modal">
+    <div class="modal-content modal-small">
+      <div class="modal-header">
+        <h3>ยืนยันการลบ</h3>
+        <button class="modal-close" id="closeConfirmModal">&times;</button>
+      </div>
+      <p id="confirmMessage">คุณต้องการลบงานนี้ใช่หรือไม่?</p>
+      <div class="form-actions">
+        <button class="btn btn-outline" id="cancelDelete">ยกเลิก</button>
+        <button class="btn btn-danger" id="confirmDelete">ลบ</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
