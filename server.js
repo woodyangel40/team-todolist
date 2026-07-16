@@ -7,7 +7,7 @@ const { pool, initDB } = require('./db');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: '10mb' }));
 
 app.use((req, res, next) => {
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
@@ -64,13 +64,71 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
+// Users Management
+app.get('/api/users', async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT id, username, display_name, role FROM users ORDER BY id');
+    res.json(rows.map(u => ({ id: u.id, username: u.username, displayName: u.display_name, role: u.role })));
+  } catch (err) {
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในระบบ' });
+  }
+});
+
+app.put('/api/users/:id', async (req, res) => {
+  const { id } = req.params;
+  const { displayName, role } = req.body;
+  try {
+    await pool.query('UPDATE users SET display_name = $1, role = $2 WHERE id = $3', [displayName, role, id]);
+    const { rows } = await pool.query('SELECT id, username, display_name, role FROM users WHERE id = $1', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'ไม่พบผู้ใช้' });
+    const u = rows[0];
+    res.json({ id: u.id, username: u.username, displayName: u.display_name, role: u.role });
+  } catch (err) {
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในระบบ' });
+  }
+});
+
+app.put('/api/users/:id/password', async (req, res) => {
+  const { id } = req.params;
+  const { currentPassword, newPassword } = req.body;
+  try {
+    const { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'ไม่พบผู้ใช้' });
+    if (rows[0].password !== currentPassword) {
+      return res.status(401).json({ error: 'รหัสผ่านเดิมไม่ถูกต้อง' });
+    }
+    await pool.query('UPDATE users SET password = $1 WHERE id = $2', [newPassword, id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในระบบ' });
+  }
+});
+
+app.delete('/api/users/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query('DELETE FROM users WHERE id = $1 AND role != $2', [id, 'admin']);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในระบบ' });
+  }
+});
+
 // Tasks
 app.get('/api/tasks', async (req, res) => {
   try {
     const { rows: tasks } = await pool.query('SELECT * FROM tasks ORDER BY created_at DESC');
     const { rows: users } = await pool.query('SELECT id, display_name FROM users');
+    const { rows: allTags } = await pool.query('SELECT t.id, t.name, t.color, tt.task_id FROM tags t LEFT JOIN task_tags tt ON t.id = tt.tag_id');
     const userMap = {};
     users.forEach(u => { userMap[u.id] = u.display_name; });
+    const taskTagsMap = {};
+    allTags.forEach(t => {
+      if (t.task_id) {
+        if (!taskTagsMap[t.task_id]) taskTagsMap[t.task_id] = [];
+        taskTagsMap[t.task_id].push({ id: t.id, name: t.name, color: t.color });
+      }
+    });
     const enriched = tasks.map(t => ({
       id: t.id,
       title: t.title,
@@ -80,7 +138,8 @@ app.get('/api/tasks', async (req, res) => {
       status: t.status,
       dueDate: t.due_date,
       createdAt: t.created_at,
-      assigneeName: userMap[t.assignee] || 'ไม่ระบุ'
+      assigneeName: userMap[t.assignee] || 'ไม่ระบุ',
+      tags: taskTagsMap[t.id] || []
     }));
     res.json(enriched);
   } catch (err) {
@@ -90,17 +149,21 @@ app.get('/api/tasks', async (req, res) => {
 });
 
 app.post('/api/tasks', async (req, res) => {
-  const { title, description, assignee, priority, status, dueDate } = req.body;
+  const { title, description, assignee, priority, status, dueDate, tags } = req.body;
   if (!title) return res.status(400).json({ error: 'กรุณากรอกชื่องาน' });
   try {
     const id = uuidv4();
     const createdAt = new Date().toISOString();
     await pool.query(
-      `INSERT INTO tasks (id, title, description, assignee, priority, status, due_date, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      `INSERT INTO tasks (id, title, description, assignee, priority, status, due_date, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
       [id, title, description || '', assignee || '', priority || 'medium', status || 'todo', dueDate || '', createdAt]
     );
-    res.json({ id, title, description, assignee, priority, status, dueDate, createdAt });
+    if (tags && tags.length > 0) {
+      for (const tagId of tags) {
+        await pool.query('INSERT INTO task_tags (task_id, tag_id) VALUES ($1, $2)', [id, tagId]);
+      }
+    }
+    res.json({ id, title, description, assignee, priority, status, dueDate, createdAt, tags: tags || [] });
   } catch (err) {
     console.error('Create task error:', err);
     res.status(500).json({ error: 'เกิดข้อผิดพลาดในระบบ' });
@@ -109,7 +172,7 @@ app.post('/api/tasks', async (req, res) => {
 
 app.put('/api/tasks/:id', async (req, res) => {
   const { id } = req.params;
-  const { title, description, assignee, priority, status, dueDate } = req.body;
+  const { title, description, assignee, priority, status, dueDate, tags } = req.body;
   try {
     const existing = await pool.query('SELECT * FROM tasks WHERE id = $1', [id]);
     if (existing.rows.length === 0) return res.status(404).json({ error: 'ไม่พบงาน' });
@@ -125,11 +188,30 @@ app.put('/api/tasks/:id', async (req, res) => {
         id
       ]
     );
+    if (tags !== undefined) {
+      await pool.query('DELETE FROM task_tags WHERE task_id = $1', [id]);
+      if (tags && tags.length > 0) {
+        for (const tagId of tags) {
+          await pool.query('INSERT INTO task_tags (task_id, tag_id) VALUES ($1, $2)', [id, tagId]);
+        }
+      }
+    }
     const { rows } = await pool.query('SELECT * FROM tasks WHERE id = $1', [id]);
     const t = rows[0];
-    res.json({ id: t.id, title: t.title, description: t.description, assignee: t.assignee, priority: t.priority, status: t.status, dueDate: t.due_date, createdAt: t.created_at });
+    res.json({ id: t.id, title: t.title, description: t.description, assignee: t.assignee, priority: t.priority, status: t.status, dueDate: t.due_date, createdAt: t.created_at, tags: tags || [] });
   } catch (err) {
     console.error('Update task error:', err);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในระบบ' });
+  }
+});
+
+app.put('/api/tasks/:id/status', async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  try {
+    await pool.query('UPDATE tasks SET status = $1 WHERE id = $2', [status, id]);
+    res.json({ success: true });
+  } catch (err) {
     res.status(500).json({ error: 'เกิดข้อผิดพลาดในระบบ' });
   }
 });
@@ -137,20 +219,121 @@ app.put('/api/tasks/:id', async (req, res) => {
 app.delete('/api/tasks/:id', async (req, res) => {
   const { id } = req.params;
   try {
+    await pool.query('DELETE FROM task_tags WHERE task_id = $1', [id]);
+    await pool.query('DELETE FROM comments WHERE task_id = $1', [id]);
     await pool.query('DELETE FROM tasks WHERE id = $1', [id]);
     res.json({ success: true });
   } catch (err) {
-    console.error('Delete task error:', err);
     res.status(500).json({ error: 'เกิดข้อผิดพลาดในระบบ' });
   }
 });
 
-app.get('/api/users', async (req, res) => {
+// Comments
+app.get('/api/tasks/:id/comments', async (req, res) => {
+  const { id } = req.params;
   try {
-    const { rows } = await pool.query('SELECT id, username, display_name, role FROM users');
-    res.json(rows.map(u => ({ id: u.id, username: u.username, displayName: u.display_name, role: u.role })));
+    const { rows } = await pool.query('SELECT * FROM comments WHERE task_id = $1 ORDER BY created_at ASC', [id]);
+    res.json(rows.map(c => ({
+      id: c.id, taskId: c.task_id, userId: c.user_id, userName: c.user_name, content: c.content, createdAt: c.created_at
+    })));
   } catch (err) {
-    console.error('Get users error:', err);
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในระบบ' });
+  }
+});
+
+app.post('/api/tasks/:id/comments', async (req, res) => {
+  const { id } = req.params;
+  const { userId, userName, content } = req.body;
+  if (!content) return res.status(400).json({ error: 'กรุณาพิมพ์ข้อความ' });
+  try {
+    const commentId = uuidv4();
+    const createdAt = new Date().toISOString();
+    await pool.query(
+      'INSERT INTO comments (id, task_id, user_id, user_name, content, created_at) VALUES ($1,$2,$3,$4,$5,$6)',
+      [commentId, id, userId, userName, content, createdAt]
+    );
+    res.json({ id: commentId, taskId: id, userId, userName, content, createdAt });
+  } catch (err) {
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในระบบ' });
+  }
+});
+
+app.delete('/api/comments/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query('DELETE FROM comments WHERE id = $1', [id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในระบบ' });
+  }
+});
+
+// Tags
+app.get('/api/tags', async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM tags ORDER BY name');
+    res.json(rows.map(t => ({ id: t.id, name: t.name, color: t.color })));
+  } catch (err) {
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในระบบ' });
+  }
+});
+
+app.post('/api/tags', async (req, res) => {
+  const { name, color } = req.body;
+  if (!name) return res.status(400).json({ error: 'กรุณากรอกชื่อแท็ก' });
+  try {
+    const id = uuidv4();
+    await pool.query('INSERT INTO tags (id, name, color) VALUES ($1,$2,$3)', [id, name, color || '#667eea']);
+    res.json({ id, name, color: color || '#667eea' });
+  } catch (err) {
+    if (err.code === '23505') return res.status(400).json({ error: 'แท็กนี้มีอยู่แล้ว' });
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในระบบ' });
+  }
+});
+
+app.delete('/api/tags/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await pool.query('DELETE FROM task_tags WHERE tag_id = $1', [id]);
+    await pool.query('DELETE FROM tags WHERE id = $1', [id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในระบบ' });
+  }
+});
+
+// Stats
+app.get('/api/stats', async (req, res) => {
+  try {
+    const { rows: tasks } = await pool.query('SELECT * FROM tasks');
+    const { rows: users } = await pool.query('SELECT id, display_name FROM users');
+
+    const total = tasks.length;
+    const done = tasks.filter(t => t.status === 'done').length;
+    const overdue = tasks.filter(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'done').length;
+    const inProgress = tasks.filter(t => t.status === 'in-progress').length;
+    const completion = total > 0 ? Math.round((done / total) * 100) : 0;
+
+    const perUser = users.map(u => {
+      const userTasks = tasks.filter(t => t.assignee === u.id);
+      const userDone = userTasks.filter(t => t.status === 'done').length;
+      const userOverdue = userTasks.filter(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'done').length;
+      const userDoneOnTime = userTasks.filter(t => {
+        if (t.status !== 'done' || !t.due_date) return false;
+        return new Date(t.created_at) <= new Date(t.due_date);
+      }).length;
+      return {
+        userId: u.id,
+        displayName: u.display_name,
+        total: userTasks.length,
+        done: userDone,
+        overdue: userOverdue,
+        completion: userTasks.length > 0 ? Math.round((userDone / userTasks.length) * 100) : 0
+      };
+    });
+
+    res.json({ total, done, overdue, inProgress, completion, perUser });
+  } catch (err) {
     res.status(500).json({ error: 'เกิดข้อผิดพลาดในระบบ' });
   }
 });

@@ -10,7 +10,11 @@
   <nav class="navbar">
     <div class="nav-brand">Team Todolist</div>
     <div class="nav-user">
+      <button id="darkModeToggle" class="icon-btn" title="Dark Mode">🌙</button>
       <span id="currentUser"></span>
+      <span id="userRole" class="role-badge"></span>
+      <button id="manageUsersBtn" class="btn btn-outline btn-sm" style="display:none">จัดการผู้ใช้</button>
+      <button id="manageTagsBtn" class="btn btn-outline btn-sm" style="display:none">จัดการแท็ก</button>
       <button id="logoutBtn" class="btn btn-outline btn-sm" onclick="localStorage.removeItem('currentUser'); window.location.href='/';">ออกจากระบบ</button>
     </div>
   </nav>
@@ -58,6 +62,9 @@
           <option value="medium">ปานกลาง</option>
           <option value="low">ต่ำ</option>
         </select>
+        <select id="filterAssignee" class="filter-select">
+          <option value="all">ทุกคน</option>
+        </select>
         <button id="addTaskBtn" class="btn btn-primary">+ เพิ่มงานใหม่</button>
       </div>
     </div>
@@ -87,6 +94,7 @@
     </div>
   </div>
 
+  <!-- Task Modal -->
   <div id="taskModal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
@@ -106,9 +114,7 @@
         <div class="form-row">
           <div class="form-group">
             <label for="taskAssignee">ผู้รับผิดชอบ</label>
-            <select id="taskAssignee">
-              <option value="">-- ไม่ระบุ --</option>
-            </select>
+            <select id="taskAssignee"><option value="">-- ไม่ระบุ --</option></select>
           </div>
           <div class="form-group">
             <label for="taskPriority">ความสำคัญ</label>
@@ -133,6 +139,18 @@
             <input type="date" id="taskDueDate">
           </div>
         </div>
+        <div class="form-group">
+          <label>แท็ก</label>
+          <div id="taskTags" class="tag-selector"></div>
+        </div>
+        <div id="commentsSection" class="comments-section" style="display:none">
+          <label>คอมเมนต์</label>
+          <div id="commentsList" class="comments-list"></div>
+          <div class="comment-input-row">
+            <input type="text" id="commentInput" placeholder="พิมพ์คอมเมนต์..." class="search-input" style="flex:1">
+            <button type="button" id="addCommentBtn" class="btn btn-primary btn-sm">ส่ง</button>
+          </div>
+        </div>
         <div class="form-actions">
           <button type="button" class="btn btn-outline" id="cancelBtn">ยกเลิก</button>
           <button type="submit" class="btn btn-primary">บันทึก</button>
@@ -141,6 +159,7 @@
     </div>
   </div>
 
+  <!-- Confirm Delete Modal -->
   <div id="confirmModal" class="modal">
     <div class="modal-content modal-small">
       <div class="modal-header">
@@ -154,6 +173,63 @@
       </div>
     </div>
   </div>
+
+  <!-- User Management Modal -->
+  <div id="userModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>จัดการผู้ใช้</h3>
+        <button class="modal-close" id="closeUserModal">&times;</button>
+      </div>
+      <div id="userList" class="user-list"></div>
+    </div>
+  </div>
+
+  <!-- Change Password Modal -->
+  <div id="passwordModal" class="modal">
+    <div class="modal-content modal-small">
+      <div class="modal-header">
+        <h3>เปลี่ยนรหัสผ่าน</h3>
+        <button class="modal-close" id="closePasswordModal">&times;</button>
+      </div>
+      <form id="passwordForm">
+        <input type="hidden" id="passwordUserId">
+        <div class="form-group">
+          <label>รหัสผ่านเดิม</label>
+          <input type="password" id="currentPassword" required>
+        </div>
+        <div class="form-group">
+          <label>รหัสผ่านใหม่</label>
+          <input type="password" id="newPassword" required>
+        </div>
+        <div id="passwordError" class="error-msg"></div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-outline" id="cancelPassword">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary">บันทึก</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Tag Management Modal -->
+  <div id="tagModal" class="modal">
+    <div class="modal-content modal-small">
+      <div class="modal-header">
+        <h3>จัดการแท็ก</h3>
+        <button class="modal-close" id="closeTagModal">&times;</button>
+      </div>
+      <div style="padding:16px">
+        <div class="form-row" style="margin-bottom:12px">
+          <input type="text" id="newTagName" placeholder="ชื่อแท็กใหม่" class="search-input" style="flex:1">
+          <input type="color" id="newTagColor" value="#667eea" style="width:44px;height:38px;border:none;cursor:pointer;border-radius:8px">
+          <button id="addTagBtn" class="btn btn-primary btn-sm">เพิ่ม</button>
+        </div>
+        <div id="tagListAdmin" class="tag-list-admin"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
 
   <script src="/js/app.js"></script>
 </body>
