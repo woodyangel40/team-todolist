@@ -1,5 +1,6 @@
 node_modules/
 data/tasks.json
 data/users.json
+start.bat
 start.ps1
 .env
