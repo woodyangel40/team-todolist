@@ -11,7 +11,7 @@
     <div class="nav-brand">Team Todolist</div>
     <div class="nav-user">
       <span id="currentUser"></span>
-      <button id="logoutBtn" class="btn btn-outline btn-sm">ออกจากระบบ</button>
+      <button id="logoutBtn" class="btn btn-outline btn-sm" onclick="localStorage.removeItem('currentUser'); window.location.href='/';">ออกจากระบบ</button>
     </div>
   </nav>
 
