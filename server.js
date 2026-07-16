@@ -138,6 +138,8 @@ app.get('/api/tasks', async (req, res) => {
       status: t.status,
       dueDate: t.due_date,
       createdAt: t.created_at,
+      cost: parseFloat(t.cost) || 0,
+      taskType: t.task_type || '',
       assigneeName: userMap[t.assignee] || 'ไม่ระบุ',
       tags: taskTagsMap[t.id] || []
     }));
@@ -149,21 +151,21 @@ app.get('/api/tasks', async (req, res) => {
 });
 
 app.post('/api/tasks', async (req, res) => {
-  const { title, description, assignee, priority, status, dueDate, tags } = req.body;
+  const { title, description, assignee, priority, status, dueDate, tags, cost, taskType } = req.body;
   if (!title) return res.status(400).json({ error: 'กรุณากรอกชื่องาน' });
   try {
     const id = uuidv4();
     const createdAt = new Date().toISOString();
     await pool.query(
-      `INSERT INTO tasks (id, title, description, assignee, priority, status, due_date, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [id, title, description || '', assignee || '', priority || 'medium', status || 'todo', dueDate || '', createdAt]
+      `INSERT INTO tasks (id, title, description, assignee, priority, status, due_date, created_at, cost, task_type) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [id, title, description || '', assignee || '', priority || 'medium', status || 'todo', dueDate || '', createdAt, cost || 0, taskType || '']
     );
     if (tags && tags.length > 0) {
       for (const tagId of tags) {
         await pool.query('INSERT INTO task_tags (task_id, tag_id) VALUES ($1, $2)', [id, tagId]);
       }
     }
-    res.json({ id, title, description, assignee, priority, status, dueDate, createdAt, tags: tags || [] });
+    res.json({ id, title, description, assignee, priority, status, dueDate, createdAt, cost: cost || 0, taskType: taskType || '', tags: tags || [] });
   } catch (err) {
     console.error('Create task error:', err);
     res.status(500).json({ error: 'เกิดข้อผิดพลาดในระบบ' });
@@ -172,12 +174,12 @@ app.post('/api/tasks', async (req, res) => {
 
 app.put('/api/tasks/:id', async (req, res) => {
   const { id } = req.params;
-  const { title, description, assignee, priority, status, dueDate, tags } = req.body;
+  const { title, description, assignee, priority, status, dueDate, tags, cost, taskType } = req.body;
   try {
     const existing = await pool.query('SELECT * FROM tasks WHERE id = $1', [id]);
     if (existing.rows.length === 0) return res.status(404).json({ error: 'ไม่พบงาน' });
     await pool.query(
-      `UPDATE tasks SET title=$1, description=$2, assignee=$3, priority=$4, status=$5, due_date=$6 WHERE id=$7`,
+      `UPDATE tasks SET title=$1, description=$2, assignee=$3, priority=$4, status=$5, due_date=$6, cost=$7, task_type=$8 WHERE id=$9`,
       [
         title || existing.rows[0].title,
         description !== undefined ? description : existing.rows[0].description,
@@ -185,6 +187,8 @@ app.put('/api/tasks/:id', async (req, res) => {
         priority || existing.rows[0].priority,
         status || existing.rows[0].status,
         dueDate !== undefined ? dueDate : existing.rows[0].due_date,
+        cost !== undefined ? cost : existing.rows[0].cost,
+        taskType !== undefined ? taskType : existing.rows[0].task_type,
         id
       ]
     );
@@ -198,7 +202,7 @@ app.put('/api/tasks/:id', async (req, res) => {
     }
     const { rows } = await pool.query('SELECT * FROM tasks WHERE id = $1', [id]);
     const t = rows[0];
-    res.json({ id: t.id, title: t.title, description: t.description, assignee: t.assignee, priority: t.priority, status: t.status, dueDate: t.due_date, createdAt: t.created_at, tags: tags || [] });
+    res.json({ id: t.id, title: t.title, description: t.description, assignee: t.assignee, priority: t.priority, status: t.status, dueDate: t.due_date, createdAt: t.created_at, cost: parseFloat(t.cost) || 0, taskType: t.task_type || '', tags: tags || [] });
   } catch (err) {
     console.error('Update task error:', err);
     res.status(500).json({ error: 'เกิดข้อผิดพลาดในระบบ' });
@@ -334,6 +338,63 @@ app.get('/api/stats', async (req, res) => {
 
     res.json({ total, done, overdue, inProgress, completion, perUser });
   } catch (err) {
+    res.status(500).json({ error: 'เกิดข้อผิดพลาดในระบบ' });
+  }
+});
+
+// Room Report
+app.get('/api/room-report', async (req, res) => {
+  const { tag_id, start_date, end_date } = req.query;
+  try {
+    let query = `
+      SELECT t.*, tt.tag_id, tg.name as tag_name, tg.color as tag_color
+      FROM tasks t
+      LEFT JOIN task_tags tt ON t.id = tt.task_id
+      LEFT JOIN tags tg ON tt.tag_id = tg.id
+      WHERE 1=1
+    `;
+    const params = [];
+    let paramIdx = 1;
+
+    if (tag_id) {
+      query += ` AND tt.tag_id = $${paramIdx++}`;
+      params.push(tag_id);
+    }
+    if (start_date) {
+      query += ` AND t.created_at >= $${paramIdx++}`;
+      params.push(start_date);
+    }
+    if (end_date) {
+      query += ` AND t.created_at <= $${paramIdx++}`;
+      params.push(end_date + 'T23:59:59.999Z');
+    }
+    query += ' ORDER BY t.created_at DESC';
+
+    const { rows } = await pool.query(query, params);
+
+    const totalCost = rows.reduce((sum, r) => sum + (parseFloat(r.cost) || 0), 0);
+
+    const byType = {};
+    rows.forEach(r => {
+      const type = r.task_type || 'อื่นๆ';
+      if (!byType[type]) byType[type] = { count: 0, cost: 0 };
+      byType[type].count++;
+      byType[type].cost += parseFloat(r.cost) || 0;
+    });
+
+    res.json({
+      tasks: rows.map(r => ({
+        id: r.id, title: r.title, description: r.description, status: r.status,
+        cost: parseFloat(r.cost) || 0, taskType: r.task_type || '',
+        roomName: r.tag_name || '', roomColor: r.tag_color || '',
+        createdAt: r.created_at, dueDate: r.due_date
+      })),
+      totalTasks: rows.length,
+      totalCost,
+      byType
+    });
+  } catch (err) {
+    console.error('Room report error:', err);
     res.status(500).json({ error: 'เกิดข้อผิดพลาดในระบบ' });
   }
 });

@@ -15,6 +15,7 @@
       <span id="userRole" class="role-badge"></span>
       <button id="manageUsersBtn" class="btn btn-outline btn-sm" style="display:none">จัดการผู้ใช้</button>
       <button id="manageTagsBtn" class="btn btn-outline btn-sm" style="display:none">จัดการแท็ก</button>
+      <button id="roomReportBtn" class="btn btn-primary btn-sm">รายงานห้อง</button>
       <button id="logoutBtn" class="btn btn-outline btn-sm" onclick="localStorage.removeItem('currentUser'); window.location.href='/';">ออกจากระบบ</button>
     </div>
   </nav>
@@ -139,8 +140,25 @@
             <input type="date" id="taskDueDate">
           </div>
         </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="taskType">ประเภทงาน</label>
+            <select id="taskType">
+              <option value="">-- ไม่ระบุ --</option>
+              <option value="cleaning">ทำความสะอาด</option>
+              <option value="maintenance">ซ่อมแซม</option>
+              <option value="repair">เปลี่ยนอุปกรณ์</option>
+              <option value="inspection">ตรวจสอบ</option>
+              <option value="other">อื่นๆ</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="taskCost">ค่าใช้จ่าย (บาท)</label>
+            <input type="number" id="taskCost" placeholder="0" min="0" step="0.01">
+          </div>
+        </div>
         <div class="form-group">
-          <label>แท็ก</label>
+          <label>แท็ก (หมายเลขห้อง)</label>
           <div id="taskTags" class="tag-selector"></div>
         </div>
         <div id="commentsSection" class="comments-section" style="display:none">
@@ -225,6 +243,43 @@
           <button id="addTagBtn" class="btn btn-primary btn-sm">เพิ่ม</button>
         </div>
         <div id="tagListAdmin" class="tag-list-admin"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Room Report Modal -->
+  <div id="roomReportModal" class="modal">
+    <div class="modal-content" style="max-width:700px">
+      <div class="modal-header">
+        <h3>รายงานงานแยกตามห้อง</h3>
+        <button class="modal-close" id="closeRoomReportModal">&times;</button>
+      </div>
+      <div style="padding:16px">
+        <div class="form-row" style="margin-bottom:12px;gap:8px">
+          <div class="form-group" style="margin:0">
+            <label>เลือกห้อง</label>
+            <select id="reportRoomFilter" class="filter-select" style="width:100%">
+              <option value="">ทุกห้อง</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label>ตั้งแต่วันที่</label>
+            <input type="date" id="reportStartDate" class="search-input" style="width:100%">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label>ถึงวันที่</label>
+            <input type="date" id="reportEndDate" class="search-input" style="width:100%">
+          </div>
+          <div class="form-group" style="margin:0;display:flex;align-items:flex-end">
+            <button id="loadReportBtn" class="btn btn-primary btn-sm">ดูรายงาน</button>
+          </div>
+        </div>
+        <div class="report-summary" id="reportSummary" style="display:none">
+          <div class="report-stat"><span>งานทั้งหมด:</span> <strong id="reportTotal">0</strong></div>
+          <div class="report-stat report-total-cost"><span>ยอดรวม:</span> <strong id="reportCost">0 บาท</strong></div>
+        </div>
+        <div id="reportBreakdown" class="report-breakdown"></div>
+        <div id="reportTaskList" class="report-task-list"></div>
       </div>
     </div>
   </div>

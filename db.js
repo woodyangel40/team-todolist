@@ -60,6 +60,18 @@ async function initDB() {
       EXCEPTION WHEN duplicate_column THEN null;
       END $$;
     `);
+    await client.query(`
+      DO $$ BEGIN
+        ALTER TABLE tasks ADD COLUMN IF NOT EXISTS cost NUMERIC DEFAULT 0;
+      EXCEPTION WHEN duplicate_column THEN null;
+      END $$;
+    `);
+    await client.query(`
+      DO $$ BEGIN
+        ALTER TABLE tasks ADD COLUMN IF NOT EXISTS task_type TEXT DEFAULT '';
+      EXCEPTION WHEN duplicate_column THEN null;
+      END $$;
+    `);
 
     const { rows } = await client.query('SELECT COUNT(*) FROM users');
     if (parseInt(rows[0].count) === 0) {

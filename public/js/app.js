@@ -100,6 +100,7 @@ function renderColumn(elementId, tasks) {
 
 function createTaskCard(task) {
   const priorityLabels = { high: 'สูง', medium: 'ปานกลาง', low: 'ต่ำ' };
+  const typeLabels = { cleaning: 'ทำความสะอาด', maintenance: 'ซ่อมแซม', repair: 'เปลี่ยนอุปกรณ์', inspection: 'ตรวจสอบ', other: 'อื่นๆ' };
   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'done';
 
   let dueDateHtml = '';
@@ -107,6 +108,16 @@ function createTaskCard(task) {
     const date = new Date(task.dueDate).toLocaleDateString('th-TH');
     const overdueClass = isOverdue ? 'overdue' : '';
     dueDateHtml = `<span class="due-date-badge ${overdueClass}">📅 ${date}</span>`;
+  }
+
+  let costHtml = '';
+  if (task.cost > 0) {
+    costHtml = `<span class="cost-badge">💰 ${task.cost.toLocaleString()} บาท</span>`;
+  }
+
+  let typeHtml = '';
+  if (task.taskType && typeLabels[task.taskType]) {
+    typeHtml = `<span class="type-badge">${typeLabels[task.taskType]}</span>`;
   }
 
   let tagsHtml = '';
@@ -136,6 +147,8 @@ function createTaskCard(task) {
       ${tagsHtml}
       <div class="task-card-meta">
         <span class="priority-badge priority-${task.priority}">${priorityLabels[task.priority]}</span>
+        ${typeHtml}
+        ${costHtml}
         ${task.assigneeName && task.assigneeName !== 'ไม่ระบุ' ? `<span class="assignee-badge">👤 ${escapeHtml(task.assigneeName)}</span>` : ''}
         ${dueDateHtml}
       </div>
@@ -238,6 +251,8 @@ function openModal(task = null) {
     document.getElementById('taskPriority').value = task.priority;
     document.getElementById('taskStatus').value = task.status;
     document.getElementById('taskDueDate').value = task.dueDate || '';
+    document.getElementById('taskType').value = task.taskType || '';
+    document.getElementById('taskCost').value = task.cost || '';
     if (task.tags) selectedTags = task.tags.map(t => t.id);
     document.getElementById('commentsSection').style.display = '';
     loadComments(task.id);
@@ -320,7 +335,9 @@ async function saveTask() {
     priority: document.getElementById('taskPriority').value,
     status: document.getElementById('taskStatus').value,
     dueDate: document.getElementById('taskDueDate').value,
-    tags: selectedTags
+    tags: selectedTags,
+    cost: parseFloat(document.getElementById('taskCost').value) || 0,
+    taskType: document.getElementById('taskType').value
   };
   if (id) {
     await fetch(`/api/tasks/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(taskData) });
@@ -466,4 +483,62 @@ function initDragAndDrop() {
       await quickStatus(taskId, newStatus);
     });
   });
+}
+
+// Room Report
+document.getElementById('roomReportBtn').addEventListener('click', openRoomReport);
+document.getElementById('closeRoomReportModal').addEventListener('click', () => document.getElementById('roomReportModal').classList.remove('active'));
+document.getElementById('loadReportBtn').addEventListener('click', loadRoomReport);
+
+function openRoomReport() {
+  const modal = document.getElementById('roomReportModal');
+  const roomFilter = document.getElementById('reportRoomFilter');
+  roomFilter.innerHTML = '<option value="">ทุกห้อง</option>';
+  allTags.forEach(tag => {
+    roomFilter.innerHTML += `<option value="${tag.id}">${escapeHtml(tag.name)}</option>`;
+  });
+  document.getElementById('reportStartDate').value = '';
+  document.getElementById('reportEndDate').value = '';
+  document.getElementById('reportSummary').style.display = 'none';
+  document.getElementById('reportBreakdown').innerHTML = '';
+  document.getElementById('reportTaskList').innerHTML = '';
+  modal.classList.add('active');
+}
+
+async function loadRoomReport() {
+  const tagId = document.getElementById('reportRoomFilter').value;
+  const startDate = document.getElementById('reportStartDate').value;
+  const endDate = document.getElementById('reportEndDate').value;
+
+  const params = new URLSearchParams();
+  if (tagId) params.set('tag_id', tagId);
+  if (startDate) params.set('start_date', startDate);
+  if (endDate) params.set('end_date', endDate);
+
+  const res = await fetch(`/api/room-report?${params}`);
+  const data = await res.json();
+
+  document.getElementById('reportSummary').style.display = '';
+  document.getElementById('reportTotal').textContent = data.totalTasks;
+  document.getElementById('reportCost').textContent = data.totalCost.toLocaleString() + ' บาท';
+
+  const breakdown = document.getElementById('reportBreakdown');
+  const typeLabels = { cleaning: 'ทำความสะอาด', maintenance: 'ซ่อมแซม', repair: 'เปลี่ยนอุปกรณ์', inspection: 'ตรวจสอบ', other: 'อื่นๆ', '': 'ไม่ระบุ' };
+  breakdown.innerHTML = '<div class="breakdown-title">แยกตามประเภท:</div>' +
+    Object.entries(data.byType).map(([type, info]) =>
+      `<span class="breakdown-item">${typeLabels[type] || type}: ${info.count} งาน (${info.cost.toLocaleString()} บาท)</span>`
+    ).join('');
+
+  const taskList = document.getElementById('reportTaskList');
+  const statusLabels = { 'todo': 'รอดำเนินการ', 'in-progress': 'กำลังทำ', 'done': 'เสร็จแล้ว' };
+  taskList.innerHTML = '<div class="breakdown-title" style="margin-top:12px">รายการงาน:</div>' +
+    data.tasks.map(t => `
+      <div class="report-task-item">
+        <div class="report-task-info">
+          <span class="report-task-title">${escapeHtml(t.title)}</span>
+          <span class="report-task-meta">${typeLabels[t.taskType] || ''} | ${statusLabels[t.status] || ''} | ${new Date(t.createdAt).toLocaleDateString('th-TH')}</span>
+        </div>
+        <span class="report-task-cost">${t.cost > 0 ? t.cost.toLocaleString() + ' บาท' : '-'}</span>
+      </div>
+    `).join('') || '<p style="color:#999;padding:12px">ไม่มีข้อมูล</p>';
 }
