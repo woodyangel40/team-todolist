@@ -60,6 +60,7 @@ function renderTasks() {
   document.getElementById('inProgressCount').textContent = lists['in-progress'].length;
   document.getElementById('doneCount').textContent = lists['done'].length;
   document.getElementById('taskCount').textContent = `${filtered.length} งาน`;
+  updateStats();
 }
 
 function renderColumn(elementId, tasks) {
@@ -78,13 +79,20 @@ function createTaskCard(task) {
     dueDateHtml = `<span class="due-date-badge ${overdueClass}">📅 ${date}</span>`;
   }
 
+  let quickActions = '';
+  if (task.status === 'todo') {
+    quickActions = `<button class="quick-btn quick-start" onclick="event.stopPropagation(); quickStatus('${task.id}', 'in-progress')">▶ เริ่มทำ</button>`;
+  } else if (task.status === 'in-progress') {
+    quickActions = `<button class="quick-btn quick-done" onclick="event.stopPropagation(); quickStatus('${task.id}', 'done')">✓ เสร็จแล้ว</button>`;
+  }
+
   return `
-    <div class="task-card" data-id="${task.id}">
+    <div class="task-card" data-id="${task.id}" onclick="editTask('${task.id}')">
       <div class="task-card-header">
         <span class="task-card-title">${escapeHtml(task.title)}</span>
         <div class="task-card-actions">
-          <button class="task-action-btn" onclick="editTask('${task.id}')" title="แก้ไข">✏️</button>
-          <button class="task-action-btn" onclick="deleteTask('${task.id}')" title="ลบ">🗑️</button>
+          <button class="task-action-btn" onclick="event.stopPropagation(); editTask('${task.id}')" title="แก้ไข">✏️</button>
+          <button class="task-action-btn" onclick="event.stopPropagation(); deleteTask('${task.id}')" title="ลบ">🗑️</button>
         </div>
       </div>
       ${task.description ? `<div class="task-card-desc">${escapeHtml(task.description)}</div>` : ''}
@@ -93,6 +101,7 @@ function createTaskCard(task) {
         ${task.assigneeName ? `<span class="assignee-badge">👤 ${escapeHtml(task.assigneeName)}</span>` : ''}
         ${dueDateHtml}
       </div>
+      ${quickActions ? `<div class="task-card-footer">${quickActions}</div>` : ''}
     </div>
   `;
 }
@@ -208,4 +217,27 @@ async function confirmDeleteTask() {
     closeConfirmModal();
     await loadTasks();
   }
+}
+
+async function quickStatus(id, newStatus) {
+  await fetch(`/api/tasks/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: newStatus })
+  });
+  await loadTasks();
+}
+
+function updateStats() {
+  const total = allTasks.length;
+  const done = allTasks.filter(t => t.status === 'done').length;
+  const inProgress = allTasks.filter(t => t.status === 'in-progress').length;
+  const overdue = allTasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'done').length;
+  const completion = total > 0 ? Math.round((done / total) * 100) : 0;
+
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statOverdue').textContent = overdue;
+  document.getElementById('statInProgress').textContent = inProgress;
+  document.getElementById('statDone').textContent = done;
+  document.getElementById('statCompletion').textContent = completion + '%';
 }

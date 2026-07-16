@@ -380,6 +380,80 @@ body {
   flex-wrap: wrap;
 }
 
+.task-card-footer {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.quick-btn {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.quick-start {
+  background: #667eea;
+  color: white;
+}
+
+.quick-start:hover {
+  background: #5a6fd6;
+}
+
+.quick-done {
+  background: #27ae60;
+  color: white;
+}
+
+.quick-done:hover {
+  background: #219a52;
+}
+
+.stats-board {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border-top: 3px solid transparent;
+}
+
+.stat-total { border-top-color: #667eea; }
+.stat-overdue { border-top-color: #e74c3c; }
+.stat-inprogress { border-top-color: #f39c12; }
+.stat-done { border-top-color: #27ae60; }
+.stat-completion { border-top-color: #667eea; }
+
+.stat-number {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.stat-total .stat-number { color: #667eea; }
+.stat-overdue .stat-number { color: #e74c3c; }
+.stat-inprogress .stat-number { color: #f39c12; }
+.stat-done .stat-number { color: #27ae60; }
+.stat-completion .stat-number { color: #667eea; }
+
+.stat-label {
+  font-size: 13px;
+  color: #777;
+  font-weight: 500;
+}
+
 .priority-badge {
   padding: 3px 10px;
   border-radius: 20px;
@@ -582,6 +656,14 @@ body {
 
   .form-row {
     grid-template-columns: 1fr;
+  }
+
+  .stats-board {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stat-number {
+    font-size: 22px;
   }
 
   .modal-content {
